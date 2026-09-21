@@ -1,0 +1,32 @@
+{
+  "name": "react-analytics-dashboard",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Workflow and Task Analytics Dashboard built with React 18, custom hooks, and comprehensive Vitest / React Testing Library unit tests",
+  "main": "src/App.jsx",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "react",
+    "custom-hooks",
+    "analytics-dashboard",
+    "vitest",
+    "testing-library"
+  ],
+  "author": "Soumya L <lsoumya014@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^14.2.1",
+    "@vitejs/plugin-react": "^4.2.1",
+    "jsdom": "^24.0.0",
+    "vitest": "^1.3.1"
+  }
+}
