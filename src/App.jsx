@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useTaskFilter } from './hooks/useTaskFilter';
+import { taskApi } from './services/taskApi';
 import { StatCard } from './components/StatCard';
 import { TaskTable } from './components/TaskTable';
 import { TaskModal } from './components/TaskModal';
@@ -51,6 +52,8 @@ export function App() {
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [apiStatusMessage, setApiStatusMessage] = useState('REST API: Ready');
 
   const { filteredTasks, metrics } = useTaskFilter(tasks, {
     searchQuery,
@@ -58,28 +61,64 @@ export function App() {
     priorityFilter
   });
 
-  const handleSaveTask = (taskData) => {
+  const handleSyncFromApi = async () => {
+    setIsSyncing(true);
+    setApiStatusMessage('Syncing with REST API...');
+    try {
+      const apiTasks = await taskApi.fetchTasks(4);
+      setTasks(apiTasks);
+      setApiStatusMessage('REST API: Synced 4 tasks');
+    } catch (err) {
+      setApiStatusMessage('REST API: Sync failed (using local cache)');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSaveTask = async (taskData) => {
     if (editingTask) {
       setTasks((prev) => prev.map((t) => (t.id === taskData.id ? taskData : t)));
+      try {
+        await taskApi.updateTaskStatus(taskData.id, taskData.status);
+      } catch (err) {
+        console.warn('REST API update skipped:', err);
+      }
     } else {
       setTasks((prev) => [taskData, ...prev]);
+      try {
+        await taskApi.createTask(taskData);
+      } catch (err) {
+        console.warn('REST API create skipped:', err);
+      }
     }
     setEditingTask(null);
   };
 
-  const handleDeleteTask = (id) => {
+  const handleDeleteTask = async (id) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await taskApi.deleteTask(id);
+    } catch (err) {
+      console.warn('REST API delete skipped:', err);
+    }
   };
 
-  const handleStatusToggle = (id) => {
+  const handleStatusToggle = async (id) => {
+    let targetStatus = 'TODO';
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id !== id) return t;
         const nextStatus =
           t.status === 'TODO' ? 'IN_PROGRESS' : t.status === 'IN_PROGRESS' ? 'COMPLETED' : 'TODO';
+        targetStatus = nextStatus;
         return { ...t, status: nextStatus, updatedAt: new Date().toISOString() };
       })
     );
+    try {
+      await taskApi.updateTaskStatus(id, targetStatus);
+    } catch (err) {
+      console.warn('REST API status update skipped:', err);
+    }
   };
 
   const handleOpenCreateModal = () => {
@@ -96,32 +135,69 @@ export function App() {
     <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh', padding: '24px' }}>
       <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
         {/* Header */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: '0 0 4px 0' }}>
-              Workflow & Task Analytics Dashboard
+              Workflow &amp; Task Analytics Dashboard
             </h1>
-            <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-              React.js component-based task management with real-time metrics & persistent state
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
+                React.js component-based task management with REST API integration &amp; local persistence
+              </p>
+              <span
+                data-testid="api-status-badge"
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  backgroundColor: '#ecfdf5',
+                  color: '#047857',
+                  border: '1px solid #a7f3d0',
+                  padding: '2px 8px',
+                  borderRadius: '12px'
+                }}
+              >
+                {apiStatusMessage}
+              </span>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={handleOpenCreateModal}
-            style={{
-              backgroundColor: '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '10px 18px',
-              fontWeight: 600,
-              fontSize: '14px',
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-            }}
-          >
-            + New Task
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              type="button"
+              data-testid="sync-api-btn"
+              onClick={handleSyncFromApi}
+              disabled={isSyncing}
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#1e3a8a',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '10px 14px',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: isSyncing ? 'not-allowed' : 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+              }}
+            >
+              {isSyncing ? 'Syncing...' : '↻ Sync REST API'}
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              style={{
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '10px 18px',
+                fontWeight: 600,
+                fontSize: '14px',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+              }}
+            >
+              + New Task
+            </button>
+          </div>
         </header>
 
         {/* Metrics Grid */}

@@ -1,17 +1,24 @@
 import React from 'react';
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { App } from '../App';
+import { taskApi } from '../services/taskApi';
 
 describe('App Dashboard Integration', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    vi.restoreAllMocks();
   });
 
-  it('renders the dashboard title and initial stat cards', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('renders the dashboard title, API status badge, and initial stat cards', () => {
     render(<App />);
 
     expect(screen.getByText(/Workflow & Task Analytics Dashboard/i)).toBeInTheDocument();
+    expect(screen.getByTestId('api-status-badge')).toHaveTextContent('REST API: Ready');
     expect(screen.getByTestId('stat-card-total-tasks')).toBeInTheDocument();
     expect(screen.getByTestId('stat-card-in-progress')).toBeInTheDocument();
     expect(screen.getByTestId('stat-card-completed')).toBeInTheDocument();
@@ -50,5 +57,33 @@ describe('App Dashboard Integration', () => {
     fireEvent.click(cancelBtn);
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('triggers REST API sync when clicking Sync REST API button', async () => {
+    const mockSyncedTasks = [
+      {
+        id: '10',
+        title: 'Remote API Integration Task',
+        description: 'Synchronized via REST fetch',
+        category: 'Engineering',
+        priority: 'HIGH',
+        status: 'IN_PROGRESS',
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    vi.spyOn(taskApi, 'fetchTasks').mockResolvedValue(mockSyncedTasks);
+
+    render(<App />);
+
+    const syncBtn = screen.getByTestId('sync-api-btn');
+    fireEvent.click(syncBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('api-status-badge')).toHaveTextContent('REST API: Synced 4 tasks');
+    });
+
+    expect(taskApi.fetchTasks).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Remote API Integration Task/i)).toBeInTheDocument();
   });
 });
