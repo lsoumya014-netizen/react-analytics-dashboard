@@ -5,6 +5,9 @@
   "description": "Workflow and Task Analytics Dashboard built with React 18, custom hooks, and comprehensive Vitest / React Testing Library unit tests",
   "main": "src/App.jsx",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
